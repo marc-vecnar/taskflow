@@ -1,0 +1,11 @@
+{
+  // Production build config. Unlike tsconfig.json (which includes tests for
+  // typechecking), this compiles only src/ with rootDir at src/ so output lands
+  // at dist/server.js — matching the `start` script — instead of dist/src/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests"]
+}

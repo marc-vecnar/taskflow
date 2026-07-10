@@ -1,0 +1,19 @@
+# Keep the build context small and secrets out of the image.
+node_modules
+dist
+coverage
+
+# Never bake local env files into an image — production reads from the
+# environment (Railway variables), not from files.
+.env
+.env.local
+.env.*.local
+
+# Dev-only and VCS noise
+.git
+.gitignore
+*.log
+.DS_Store
+tests
+.claude
+README.md
