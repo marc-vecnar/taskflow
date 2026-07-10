@@ -4,6 +4,12 @@
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 
+# Prisma's engine needs OpenSSL even at generate time; install it before deps so
+# the postinstall/generate step can detect libssl.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
 # Install deps first for better layer caching. npm ci needs the lockfile.
 COPY package.json package-lock.json ./
 RUN npm ci
