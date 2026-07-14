@@ -16,6 +16,14 @@ enum TaskStatus {
   DONE
 }
 
+// Declaration order IS the sort order: Postgres orders enum columns by the
+// order values are declared here, so LOW < MEDIUM < HIGH. Never alphabetize.
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -49,6 +57,7 @@ model Task {
   title       String
   description String?
   status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
   dueDate     DateTime?
   isDeleted   Boolean    @default(false)
   deletedAt   DateTime?
@@ -59,7 +68,8 @@ model Task {
   updatedAt   DateTime   @updatedAt
 
   @@index([userId])
-  @@index([userId, isDeleted])
+  // Covers both the list filter (userId, isDeleted) and the priority sort.
+  @@index([userId, isDeleted, priority])
   @@map("tasks")
 }
 

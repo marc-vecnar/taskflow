@@ -19,6 +19,7 @@ const taskWithTagsSelect = {
   title: true,
   description: true,
   status: true,
+  priority: true,
   dueDate: true,
   createdAt: true,
   updatedAt: true,

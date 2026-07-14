@@ -2,7 +2,7 @@
 // the whole router; routes validate input and shape the response envelope while
 // all logic lives in the task service.
 import { Router } from "express";
-import { TaskStatus } from "@prisma/client";
+import { Priority, TaskStatus } from "@prisma/client";
 import { z } from "zod";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { ok, paginated } from "../lib/http.js";
@@ -16,7 +16,17 @@ const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(255),
   description: z.string().max(2000).nullish(),
   status: z.nativeEnum(TaskStatus).optional(),
+  priority: z.nativeEnum(Priority).optional(),
   dueDate: z.coerce.date().nullish(),
+});
+
+// List query: pagination plus sort controls. Merged into ONE schema because
+// `validate(..., "query")` overwrites req.query with the parsed result, so two
+// separate query validators would clobber each other's output. Defaults
+// reproduce the historical "createdAt desc" ordering.
+const listTasksQuerySchema = paginationSchema.extend({
+  sortBy: z.enum(taskService.TASK_SORT_FIELDS).default("createdAt"),
+  order: z.enum(taskService.SORT_ORDERS).default("desc"),
 });
 
 // Every field optional for a PATCH, but at least one must be present so an
@@ -46,14 +56,16 @@ tasksRouter.post(
 
 tasksRouter.get(
   "/",
-  validate(paginationSchema, "query"),
+  validate(listTasksQuerySchema, "query"),
   asyncHandler(async (req, res) => {
-    const { limit, offset } = req.query as unknown as z.infer<
-      typeof paginationSchema
+    const { limit, offset, sortBy, order } = req.query as unknown as z.infer<
+      typeof listTasksQuerySchema
     >;
     const { items, total } = await taskService.listTasks(req.user!.id, {
       limit,
       offset,
+      sortBy,
+      order,
     });
     res.status(200).json(paginated(items, { limit, offset, total }));
   }),

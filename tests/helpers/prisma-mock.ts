@@ -43,6 +43,44 @@ function matchesTask(row: Record<string, any>, where: any = {}): boolean {
   );
 }
 
+// Priority sorts by enum DECLARATION order, not lexically ("HIGH" < "LOW" <
+// "MEDIUM" would be wrong). Mirrors the Prisma enum in schema.prisma.
+const PRIORITY_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+// Compares two task rows on a single orderBy field. Priority uses the rank map;
+// everything else (createdAt, id, _seq) compares with < / >. Returns a negative,
+// zero, or positive number for asc ordering.
+function compareField(
+  a: Record<string, any>,
+  b: Record<string, any>,
+  field: string,
+): number {
+  if (field === "priority") {
+    return (PRIORITY_RANK[a.priority] ?? 0) - (PRIORITY_RANK[b.priority] ?? 0);
+  }
+  const av = a[field];
+  const bv = b[field];
+  return av < bv ? -1 : av > bv ? 1 : 0;
+}
+
+// Applies a Prisma orderBy — either one { field: dir } object or an array of
+// them (used as tiebreakers, in order) — to sort task rows. Honors asc/desc per
+// field so priority-sort tests are deterministic.
+function sortByOrderBy(
+  rows: Array<Record<string, any>>,
+  orderBy: any,
+): Array<Record<string, any>> {
+  const clauses = (Array.isArray(orderBy) ? orderBy : [orderBy]).filter(Boolean);
+  return rows.sort((a, b) => {
+    for (const clause of clauses) {
+      const [field, dir] = Object.entries(clause)[0] as [string, string];
+      const cmp = compareField(a, b, field);
+      if (cmp !== 0) return dir === "desc" ? -cmp : cmp;
+    }
+    return 0;
+  });
+}
+
 // Narrows a tag row (id, userId, name equality) for the tag service.
 function matchesTag(row: Record<string, any>, where: any = {}): boolean {
   return (
@@ -110,6 +148,7 @@ export const prismaMock = {
         id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
         description: null,
         status: "TODO",
+        priority: "MEDIUM",
         dueDate: null,
         isDeleted: false,
         deletedAt: null,
@@ -123,11 +162,14 @@ export const prismaMock = {
       return project(row, select);
     }),
     findMany: vi.fn(
-      async ({ where, select, skip = 0, take }: { where?: any; select?: any; skip?: number; take?: number }) => {
-        const rows = db.tasks
-          .filter((t) => matchesTask(t, where))
-          // createdAt desc, tie-broken by insertion order (desc) for stability.
-          .sort((a, b) => b.createdAt - a.createdAt || b._seq - a._seq);
+      async ({ where, select, orderBy, skip = 0, take }: { where?: any; select?: any; orderBy?: any; skip?: number; take?: number }) => {
+        // Default to createdAt desc (tie-broken by insertion order desc for
+        // stability) when the caller gives no orderBy, matching the old behavior.
+        const rows = orderBy
+          ? sortByOrderBy(db.tasks.filter((t) => matchesTask(t, where)), orderBy)
+          : db.tasks
+              .filter((t) => matchesTask(t, where))
+              .sort((a, b) => b.createdAt - a.createdAt || b._seq - a._seq);
         const page = rows.slice(skip, take === undefined ? undefined : skip + take);
         return page.map((r) => project(r, select));
       },

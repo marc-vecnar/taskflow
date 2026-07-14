@@ -75,6 +75,114 @@ describe("POST /tasks", () => {
   });
 });
 
+describe("priority", () => {
+  it("defaults priority to MEDIUM when omitted", async () => {
+    const { status, body } = await api.post("/tasks", { title: "no prio" }, auth());
+    expect(status).toBe(201);
+    expect(body.data.priority).toBe("MEDIUM");
+  });
+
+  it("accepts an explicit priority on create", async () => {
+    const { status, body } = await api.post(
+      "/tasks",
+      { title: "urgent", priority: "HIGH" },
+      auth(),
+    );
+    expect(status).toBe(201);
+    expect(body.data.priority).toBe("HIGH");
+  });
+
+  it("rejects an invalid priority with 400", async () => {
+    const { status, body } = await api.post(
+      "/tasks",
+      { title: "bad", priority: "URGENT" },
+      auth(),
+    );
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(db.tasks).toHaveLength(0);
+  });
+
+  it("updates priority via PATCH", async () => {
+    const { body: created } = await api.post("/tasks", { title: "raise me" }, auth());
+    expect(created.data.priority).toBe("MEDIUM");
+
+    const { status, body } = await api.patch(
+      `/tasks/${created.data.id}`,
+      { priority: "LOW" },
+      auth(),
+    );
+    expect(status).toBe(200);
+    expect(body.data.priority).toBe("LOW");
+  });
+});
+
+describe("GET /tasks sorting", () => {
+  // Seed one task per priority. Returns their created ids keyed by priority.
+  async function seedPriorities() {
+    const ids: Record<string, string> = {};
+    for (const priority of ["MEDIUM", "HIGH", "LOW"]) {
+      const { body } = await api.post(
+        "/tasks",
+        { title: priority.toLowerCase(), priority },
+        auth(),
+      );
+      ids[priority] = body.data.id;
+    }
+    return ids;
+  }
+
+  it("defaults to createdAt desc (newest first), unchanged from before", async () => {
+    await api.post("/tasks", { title: "first" }, auth());
+    await api.post("/tasks", { title: "second" }, auth());
+    await api.post("/tasks", { title: "third" }, auth());
+
+    const { status, body } = await api.get("/tasks", auth());
+    expect(status).toBe(200);
+    expect(body.data.map((t: any) => t.title)).toEqual(["third", "second", "first"]);
+  });
+
+  it("sorts by priority ascending (LOW first) when asked", async () => {
+    await seedPriorities();
+    const { body } = await api.get("/tasks?sortBy=priority&order=asc", auth());
+    expect(body.data.map((t: any) => t.priority)).toEqual(["LOW", "MEDIUM", "HIGH"]);
+  });
+
+  it("sorts by priority descending (HIGH first) when asked", async () => {
+    await seedPriorities();
+    const { body } = await api.get("/tasks?sortBy=priority&order=desc", auth());
+    expect(body.data.map((t: any) => t.priority)).toEqual(["HIGH", "MEDIUM", "LOW"]);
+  });
+
+  it("breaks priority ties with a stable id order", async () => {
+    // Three tasks at the same priority; ordering must be deterministic (id desc
+    // for order=desc) so pagination never repeats or skips a row.
+    const created: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const { body } = await api.post(
+        "/tasks",
+        { title: `t${i}`, priority: "MEDIUM" },
+        auth(),
+      );
+      created.push(body.data.id);
+    }
+    const { body } = await api.get("/tasks?sortBy=priority&order=desc", auth());
+    expect(body.data.map((t: any) => t.id)).toEqual([...created].reverse());
+  });
+
+  it("rejects an unknown sortBy with 400", async () => {
+    const { status, body } = await api.get("/tasks?sortBy=title", auth());
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("BAD_REQUEST");
+  });
+
+  it("rejects an unknown order with 400", async () => {
+    const { status, body } = await api.get("/tasks?order=sideways", auth());
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("BAD_REQUEST");
+  });
+});
+
 describe("GET /tasks", () => {
   it("lists only the caller's tasks with pagination meta", async () => {
     await api.post("/tasks", { title: "a" }, auth());
