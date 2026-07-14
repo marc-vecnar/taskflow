@@ -162,6 +162,80 @@ describe("PATCH /tasks/:id", () => {
   });
 });
 
+describe("dueDate", () => {
+  // A fixed instant; z.coerce.date() parses the ISO string to a Date, which
+  // res.json() serializes back to the same ISO string, so it round-trips exactly.
+  const DUE = "2026-08-01T00:00:00.000Z";
+
+  it("accepts a dueDate on create and round-trips it as an ISO string", async () => {
+    const { status, body } = await api.post(
+      "/tasks",
+      { title: "ship it", dueDate: DUE },
+      auth(),
+    );
+
+    expect(status).toBe(201);
+    expect(body.data.dueDate).toBe(DUE);
+    // Stored as a real Date on the row (coerced by validation before the service).
+    expect(db.tasks[0]!.dueDate).toBeInstanceOf(Date);
+  });
+
+  it("defaults dueDate to null when omitted", async () => {
+    const { body } = await api.post("/tasks", { title: "no deadline" }, auth());
+    expect(body.data).toHaveProperty("dueDate", null);
+  });
+
+  it("rejects an unparseable dueDate with 400", async () => {
+    const { status, body } = await api.post(
+      "/tasks",
+      { title: "bad date", dueDate: "not-a-date" },
+      auth(),
+    );
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(db.tasks).toHaveLength(0);
+  });
+
+  it("exposes dueDate on GET by id", async () => {
+    const { body: created } = await api.post(
+      "/tasks",
+      { title: "with due", dueDate: DUE },
+      auth(),
+    );
+    const { body } = await api.get(`/tasks/${created.data.id}`, auth());
+    expect(body.data.dueDate).toBe(DUE);
+  });
+
+  it("sets a dueDate via PATCH on a task that had none", async () => {
+    const { body: created } = await api.post("/tasks", { title: "later" }, auth());
+    expect(created.data.dueDate).toBeNull();
+
+    const { status, body } = await api.patch(
+      `/tasks/${created.data.id}`,
+      { dueDate: DUE },
+      auth(),
+    );
+    expect(status).toBe(200);
+    expect(body.data.dueDate).toBe(DUE);
+  });
+
+  it("clears a dueDate via PATCH with null", async () => {
+    const { body: created } = await api.post(
+      "/tasks",
+      { title: "reschedule", dueDate: DUE },
+      auth(),
+    );
+
+    const { status, body } = await api.patch(
+      `/tasks/${created.data.id}`,
+      { dueDate: null },
+      auth(),
+    );
+    expect(status).toBe(200);
+    expect(body.data.dueDate).toBeNull();
+  });
+});
+
 describe("DELETE /tasks/:id", () => {
   it("soft-deletes a task and returns 204", async () => {
     const { body: created } = await api.post("/tasks", { title: "bye" }, auth());
