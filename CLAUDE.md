@@ -84,3 +84,10 @@ The API surface described in [SPEC.md](./SPEC.md) is implemented end to end:
 
 Tests live in `tests/` and are route-level, driving the app through `createApp()` with Prisma mocked (`tests/helpers/prisma-mock.ts`); there are no service-layer unit tests yet, which is the most obvious coverage gap.
 
+## Safety Rules
+
+- Never modify .env or .env.local files
+- Never modify files in prisma/migrations/ without explicit approval
+- Before making changes to more than 5 files, show the plan and wait for approval
+- Never run commands against production database
+- If a test fails, fix the code. Never modify a test to make it pass.

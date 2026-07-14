@@ -3,6 +3,11 @@
     "playwright": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-postgres@latest",
+    "postgres://localhost:5432/taskflow"]
     }
   }
 }

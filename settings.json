@@ -1,0 +1,31 @@
+{
+    "permissions": {
+        "allow":[
+            "read", "edit", "write", "glob", "grep",
+            "Bash (npm test)",
+            "Bash (npm run lint)",
+            "Bash (npm run build)",
+            "Bash (npx prisma generate)",
+            "Bash (npx tsc --noEmit)",
+            "Bash (git status)",
+            "Bash (git diff *)",
+            "Bash (git log *)",
+            "Bash (git branch *)",
+            "Bash (curl *)"
+        ],
+        "deny":[
+            "Bash (git push *)",
+            "Bash (git push)",
+            "Bash (git reset --hard)",
+            "Bash (git checkout -- *)",
+            "Bash (git clean *)",
+            "Bash (rm -rf *)",
+            "Bash (rm -r *)",
+            "Bash (drop *)",
+            "Bash (DROP *)",
+            "Bash (npx prisma migrate reset)",
+            "Bash (npx prisma db push --force-reset)"
+
+        ]
+    }
+}

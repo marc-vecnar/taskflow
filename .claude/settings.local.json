@@ -4,5 +4,19 @@
       "Bash(npm run *)",
       "Bash(npm test *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/credential-scan.sh\"",
+            "statusMessage": "Scanning for credentials..."
+          }
+        ]
+      }
+    ]
   }
 }
